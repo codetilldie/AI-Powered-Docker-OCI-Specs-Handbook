@@ -111,6 +111,32 @@ OCI 运行时规范不仅定义了容器的配置格式（通过 `config.json`�
 
 ### 容器生命周期概览
 
+```mermaid
+stateDiagram-v2
+    [*] --> Created: runc create
+    Created --> Running: runc start
+    Running --> Stopped: 进程退出 / runc kill
+    Running --> Paused: runc pause
+    Paused --> Running: runc resume
+    Stopped --> [*]: runc delete
+    Created --> [*]: runc delete
+    
+    note right of Created
+        资源已分配
+        进程未启动
+    end note
+    
+    note right of Running
+        应用正在执行
+        PID 1 进程运行中
+    end note
+    
+    note right of Stopped
+        进程已终止
+        资源仍保留
+    end note
+```
+
 一个典型的 OCI 容器生命周期流程如下：
 
 1.  **准备**: 用户提供 OCI 镜像和 OCI 运行时配置 `config.json`。
@@ -121,6 +147,37 @@ OCI 运行时规范不仅定义了容器的配置格式（通过 `config.json`�
     *   如果应用程序响应信号并退出，容器进程终止，容器状态可能变为 `stopped`。
     *   如果应用程序无响应，可能需要发送更强的信号（如 SIGKILL）。
 5.  **删除**: 容器运行时执行 `runc delete <container-id>`，容器资源被清理。
+
+**完整命令示例**：
+
+```bash
+# 1. 创建容器（但不启动）
+$ sudo runc create mycontainer
+# 容器状态: created
+
+# 2. 查看状态
+$ sudo runc state mycontainer
+{
+  "id": "mycontainer",
+  "pid": 12345,
+  "status": "created",
+  "bundle": "/path/to/bundle"
+}
+
+# 3. 启动容器
+$ sudo runc start mycontainer
+# 容器状态: running
+
+# 4. 发送信号（优雅停止）
+$ sudo runc kill mycontainer SIGTERM
+
+# 5. 强制停止（如果未响应）
+$ sudo runc kill mycontainer SIGKILL
+# 容器状态: stopped
+
+# 6. 删除容器
+$ sudo runc delete mycontainer
+```
 
 通过这组标准化的操作，OCI 运行时规范确保了容器管理工具可以以可预测和一致的方式与不同的容器运行时交互。
 
